@@ -29,7 +29,7 @@ def uploadImage(imageX, imageY, imageZ, rotation):
 
     url = json.loads(http_response.text)["URL"]
 
-    http_response = requests.put(url, data=open('./test.png', 'rb'))
+    http_response = requests.put(url, data=open('./test.jpeg', 'rb'))
     print(http_response.text)
 
 def audioThreadFunction():
