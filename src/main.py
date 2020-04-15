@@ -7,12 +7,26 @@ import socket
 import pyaudio
 
 import astar
+import iforest
 
 url_prefix = "http://bmgxwpyyd2.execute-api.us-east-1.amazonaws.com/prod/"
+
+class IsFault:
+   def __init__(self):
+       self.is_fault = False
+
+   def fault(self):
+       self.is_fault = True
+   def no_fault(self):
+       self.is_fault = False
 
 def main():
     audioThread = threading.Thread(target=audioThreadFunction, daemon=True)
     audioThread.start()
+
+    is_fault = IsFault()
+    sensorDataThread = threading.Thread(target=iforest.sensor_data, args=(is_fault,), daemon=True)
+    sensorDataThread.start()
 
     url = url_prefix + "sensordata"
     maze = [[1 for j in range(100)] for i in range(100)]
@@ -66,11 +80,17 @@ def main():
         droneImageZ = sensorValues['droneImageZ']
         droneImageRot = sensorValues['droneImageRot']
         if (lastDroneImageX != droneImageX or lastDroneImageY != droneImageY or lastDroneImageZ != droneImageZ or lastDroneImageRot != droneImageRot):
+            print("uploading image")
             lastDroneImageX = droneImageX
             lastDroneImageY = droneImageY
             lastDroneImageZ = droneImageZ
             lastDroneImageRot = droneImageRot
             uploadImage(droneImageX, droneImageY, droneImageZ, droneImageRot)
+
+        if (sensorValues['isFault'] == "1"):
+            is_fault.fault()
+        else:
+            is_fault.no_fault()
         time.sleep(1)
 
 def translate(value, leftMin, leftMax, rightMin, rightMax):
