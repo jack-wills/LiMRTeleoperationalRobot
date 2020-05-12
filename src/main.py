@@ -19,13 +19,22 @@ class IsFault:
        self.is_fault = True
    def no_fault(self):
        self.is_fault = False
+class IsPause:
+   def __init__(self):
+       self.is_pause = False
+
+   def pause(self):
+       self.is_pause = True
+   def no_pause(self):
+       self.is_pause = False
 
 def main():
-    audioThread = threading.Thread(target=audioThreadFunction, daemon=True)
-    audioThread.start()
+    #audioThread = threading.Thread(target=audioThreadFunction, daemon=True)
+    #audioThread.start()
 
     is_fault = IsFault()
-    sensorDataThread = threading.Thread(target=iforest.sensor_data, args=(is_fault,), daemon=True)
+    is_pause = IsPause()
+    sensorDataThread = threading.Thread(target=iforest.sensor_data, args=(is_fault,is_pause,), daemon=True)
     sensorDataThread.start()
 
     url = url_prefix + "sensordata"
@@ -68,12 +77,25 @@ def main():
             lastGoToY = goToY
             start = (currentX, currentY)
             end = (goToX, goToY)
-
+            
+            print(start)
+            print(end)
             path = astar.astar(maze, start, end)
-            print(path)
+            if(path is None):
+                print("No path found")
+                coords = {"robotCoordX": sensorValues['robotGoToX'],
+                            "robotCoordY": sensorValues['robotGoToY']}
+                data = {
+                    "timestamp": "{:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now()),
+                    "sensorValues": json.dumps(coords)
+                }
+                requests.post(url, json=data)
+            else:
+                print(path)
+                is_pause.pause()
 
-            pathFollowThread = threading.Thread(target=pathFollowFunction, args=(path,))
-            pathFollowThread.start()
+                pathFollowThread = threading.Thread(target=pathFollowFunction, args=(path, is_pause))
+                pathFollowThread.start()
         
         droneImageX = sensorValues['droneImageX']
         droneImageY = sensorValues['droneImageY']
@@ -104,7 +126,7 @@ def translate(value, leftMin, leftMax, rightMin, rightMax):
     # Convert the 0-1 range into a value in the right range.
     return rightMin + (valueScaled * rightSpan)
 
-def pathFollowFunction(path):
+def pathFollowFunction(path, is_pause):
     t = threading.currentThread()
     url = url_prefix + "sensordata"
     for i in range(len(path)-1):
@@ -127,6 +149,7 @@ def pathFollowFunction(path):
         }
 
         requests.post(url, json=data)
+    
 
     coord = path[-1]
     print(coord)
@@ -142,6 +165,7 @@ def pathFollowFunction(path):
     }
 
     requests.post(url, json=data)
+    is_pause.no_pause()
 
 
 def uploadImage(imageX, imageY, imageZ, rotation):
